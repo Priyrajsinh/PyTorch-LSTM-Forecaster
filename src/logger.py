@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 
 def get_logger(name: str) -> logging.Logger:
