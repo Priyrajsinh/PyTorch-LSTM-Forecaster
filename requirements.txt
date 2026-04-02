@@ -1,0 +1,27 @@
+torch
+torchvision
+torchaudio
+torchinfo
+mlflow
+fastapi
+uvicorn
+gradio
+pandera
+pydantic
+slowapi
+prometheus-fastapi-instrumentator
+python-json-logger
+bandit
+pip-audit
+detect-secrets
+scikit-learn
+pandas
+numpy
+matplotlib
+joblib
+psutil
+httpx
+pytest-asyncio
+# [dev] stubs
+types-PyYAML
+types-requests

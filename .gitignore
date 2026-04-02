@@ -1,0 +1,40 @@
+# Model artifacts — never commit
+models/*.pt
+models/*.joblib
+
+# Raw data — too large / proprietary
+data/raw/*.csv
+data/raw/*.zip
+
+# Environment
+.env
+venv/
+.venv/
+
+# MLflow runs
+mlruns/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Type checking cache
+.mypy_cache/
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets scan
+.secrets.baseline

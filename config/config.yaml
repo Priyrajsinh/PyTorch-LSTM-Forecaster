@@ -1,0 +1,39 @@
+model:
+  input_size: 15
+  hidden_size: 64
+  num_layers: 2
+  dropout: 0.2
+  output_size: 1
+
+training:
+  lookback: 72
+  horizon: 24
+  batch_size: 64
+  epochs: 50
+  learning_rate: 1.0e-3
+  max_norm: 1.0
+  patience: 10
+  seed: 42
+
+data:
+  target_col: "T (degC)"
+  resample_freq: "1H"
+  train_split: 0.70
+  val_split: 0.15
+  test_split: 0.15
+  url: "https://storage.googleapis.com/tensorflow/tf-keras-datasets/jena_climate_2009_2016.csv.zip"
+
+evaluation:
+  horizons: [6, 12, 24, 48]
+
+api:
+  rate_limit_forecast: "20/minute"
+  max_payload_mb: 2
+  cors_origins:
+    - "http://localhost:3000"
+
+mlflow:
+  experiment_name: b3-lstm-forecaster
+
+docker:
+  image_name: b3-lstm-forecaster
