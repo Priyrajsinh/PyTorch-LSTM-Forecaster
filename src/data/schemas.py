@@ -1,4 +1,5 @@
 """Pydantic schemas for API request and response validation."""
+
 import uuid
 from typing import Optional
 

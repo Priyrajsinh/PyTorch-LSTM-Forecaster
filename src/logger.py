@@ -1,4 +1,5 @@
 """Structured JSON logger for B3 LSTM Forecaster."""
+
 import logging
 import sys
 

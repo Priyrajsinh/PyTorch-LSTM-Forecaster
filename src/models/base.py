@@ -1,4 +1,5 @@
 """Abstract base class for all B3 forecasting models."""
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
