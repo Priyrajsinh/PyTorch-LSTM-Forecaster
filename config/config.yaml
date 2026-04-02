@@ -17,7 +17,7 @@ training:
 
 data:
   target_col: "T (degC)"
-  resample_freq: "1H"
+  resample_freq: "1h"
   train_split: 0.70
   val_split: 0.15
   test_split: 0.15
