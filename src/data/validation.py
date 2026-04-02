@@ -1,6 +1,5 @@
 """Pandera schema for Jena Climate dataset validation."""
 
-import pandera as pa
 from pandera import Column, DataFrameSchema
 
 CLIMATE_SCHEMA = DataFrameSchema(

@@ -1,7 +1,6 @@
 """Day 0 scaffold tests — no pre-built artifacts required."""
 
 import pytest
-import numpy as np
 
 
 def test_climate_schema_exists():
@@ -28,8 +27,9 @@ def test_exceptions_hierarchy():
 
 def test_seed_sets_torch_determinism(tmp_path):
     """set_seed(42) must produce identical torch tensors across calls."""
-    from utils.seed import set_seed
     import torch
+
+    from utils.seed import set_seed
 
     set_seed(42)
     a = torch.randn(3)
