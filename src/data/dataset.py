@@ -72,7 +72,9 @@ def load_jena(config: Dict[str, Any]) -> pd.DataFrame:
     # SHA-256 checksum of the processed DataFrame
     checksum = hashlib.sha256(df.to_csv().encode()).hexdigest()
     checksums_path = raw_dir / "checksums.json"
-    json.dump({"jena_climate": checksum}, checksums_path.open("w"))
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    with open(str(checksums_path), "w") as fh:
+        json.dump({"jena_climate": checksum}, fh)
     logger.info(
         "Jena Climate loaded",
         extra={"rows": len(df), "checksum_prefix": checksum[:12]},

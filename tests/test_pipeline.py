@@ -186,6 +186,7 @@ class TestLoadJena:
         mock_open = MagicMock()
         with (
             patch("src.data.dataset.Path.exists", return_value=True),
+            patch("src.data.dataset.Path.mkdir"),
             patch("pandas.read_csv", return_value=raw_df),
             patch("src.data.validation.CLIMATE_SCHEMA.validate", return_value=None),
             patch("json.dump"),
@@ -219,6 +220,7 @@ class TestLoadJena:
         raw_df = _make_dummy_df(100, raw=True)
         with (
             patch("src.data.dataset.Path.exists", return_value=True),
+            patch("src.data.dataset.Path.mkdir"),
             patch("pandas.read_csv", return_value=raw_df),
             patch(
                 "src.data.validation.CLIMATE_SCHEMA.validate",
@@ -237,6 +239,7 @@ class TestLoadJena:
         raw_df = _make_dummy_df(100, raw=True)
         with (
             patch("src.data.dataset.Path.exists", return_value=True),
+            patch("src.data.dataset.Path.mkdir"),
             patch("pandas.read_csv", return_value=raw_df),
             patch("src.data.validation.CLIMATE_SCHEMA.validate", return_value=None),
             patch("json.dump") as mock_jdump,
