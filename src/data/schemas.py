@@ -3,7 +3,7 @@
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 
 class ForecastInput(BaseModel):
@@ -17,13 +17,13 @@ class ForecastInput(BaseModel):
     values: list[list[float]]
     feature_names: list[str]
 
-    @validator("values")
-    def check_shape(cls, v: list[list[float]], values: dict) -> list[list[float]]:
+    @field_validator("values")
+    @classmethod
+    def check_shape(cls, v: list[list[float]]) -> list[list[float]]:
         """Validate that values is non-empty.
 
         Args:
             v: The values list to validate.
-            values: Already-validated fields dict.
 
         Returns:
             The validated values list.
