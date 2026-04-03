@@ -32,7 +32,9 @@ def test_dataloader_no_shuffle() -> None:
     loader = DataLoader(ds, batch_size=16, shuffle=False)
     first_batch_1, _ = next(iter(loader))
     first_batch_2, _ = next(iter(loader))
-    assert torch.allclose(first_batch_1, first_batch_2), "Same seed must give same order"
+    assert torch.allclose(
+        first_batch_1, first_batch_2
+    ), "Same seed must give same order"
 
 
 def test_y_is_target_col_only() -> None:
@@ -64,4 +66,6 @@ def test_consecutive_windows_overlap_by_lookback_minus_one() -> None:
     X0, _ = ds[0]
     X1, _ = ds[1]
     # X1[0] should equal X0[1]
-    assert torch.allclose(X1[0], X0[1]), "Consecutive windows must share lookback-1 steps"
+    assert torch.allclose(
+        X1[0], X0[1]
+    ), "Consecutive windows must share lookback-1 steps"

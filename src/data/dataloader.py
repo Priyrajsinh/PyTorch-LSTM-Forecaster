@@ -14,7 +14,12 @@ logger = get_logger(__name__)
 
 def build_dataloaders(
     config: dict[str, Any],
-) -> tuple[DataLoader[tuple[Any, Any]], DataLoader[tuple[Any, Any]], DataLoader[tuple[Any, Any]], int]:
+) -> tuple[
+    DataLoader[tuple[Any, Any]],
+    DataLoader[tuple[Any, Any]],
+    DataLoader[tuple[Any, Any]],
+    int,
+]:
     """Build train/val/test DataLoaders from processed splits.
 
     Args:
