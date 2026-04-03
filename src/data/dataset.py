@@ -55,7 +55,9 @@ def load_jena(config: Dict[str, Any]) -> pd.DataFrame:
             str(raw_path),
             index_col="Date Time",
             parse_dates=True,
+            dayfirst=True,
         )
+        df.index = pd.DatetimeIndex(df.index)
     except Exception as exc:
         raise DataLoadError(f"Failed to parse Jena Climate CSV: {exc}") from exc
 
