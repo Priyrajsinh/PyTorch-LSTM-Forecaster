@@ -1,7 +1,6 @@
 """Tests for SlidingWindowDataset — all use synthetic data, never real files."""
 
 import numpy as np
-import pytest
 import torch
 from torch.utils.data import DataLoader
 
@@ -26,7 +25,7 @@ def test_sliding_window_shapes() -> None:
 
 
 def test_dataloader_no_shuffle() -> None:
-    """DataLoader with shuffle=False must return identical first batches on two passes."""
+    """DataLoader with shuffle=False must return the same first batch on two passes."""
     data = np.random.randn(300, 14).astype(np.float32)
     ds = SlidingWindowDataset(data, lookback=24, horizon=12, target_idx=1)
     loader = DataLoader(ds, batch_size=16, shuffle=False)
