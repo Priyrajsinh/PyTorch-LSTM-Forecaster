@@ -31,7 +31,7 @@ def load_model_and_scaler(
     """Load best checkpoint and scaler from models/.
 
     Args:
-        config: Full config dict (unused here; model config read from checkpoint).
+        config: Full config dict (model config is read from the checkpoint itself).
 
     Returns:
         Tuple of (model in eval mode, fitted scaler, raw checkpoint dict).
@@ -58,13 +58,17 @@ def _inverse_scale(
     n_features: int,
     target_idx: int,
 ) -> np.ndarray:
-    """Inverse-scale a 1D array of target values back to °C.
+    """Inverse-scale a 1D array of standardised target values back to °C.
+
+    The scaler was fitted on all n_features columns (including the target).
+    We reconstruct a zero-padded dummy array, fill the target column, then
+    call inverse_transform to recover the original °C values.
 
     Args:
-        arr_1d: 1-D array of scaled predictions or actuals.
-        scaler: Fitted StandardScaler with n_features_in_ columns.
-        n_features: Total number of features the scaler was fitted on.
-        target_idx: Column index of the target variable.
+        arr_1d: 1-D array of standardised predictions or actuals.
+        scaler: Fitted StandardScaler (n_features_in_ == n_features).
+        n_features: Total number of features in the scaler (same as DataFrame columns).
+        target_idx: Column index of T (degC) in the DataFrame / scaler.
 
     Returns:
         1-D array in original °C units.
@@ -76,7 +80,12 @@ def _inverse_scale(
 
 
 def evaluate_multi_horizon(config: dict[str, Any]) -> dict[str, dict[str, float]]:
-    """Evaluate MSE/MAE/RMSE at each horizon in config.evaluation.horizons.
+    """Evaluate MSE / MAE / RMSE in °C at each horizon in config.evaluation.horizons.
+
+    Strategy: run inference once using the full training horizon, then slice the
+    prediction tensor to each evaluation horizon.  This means evaluation is always
+    consistent with how the model was trained (via model.forward()) and avoids any
+    manual layer-bypass hacks.
 
     Args:
         config: Full config dict.
@@ -91,35 +100,38 @@ def evaluate_multi_horizon(config: dict[str, Any]) -> dict[str, dict[str, float]
     target_idx: int = feature_cols.index(target_col)
     test_arr = test_df.values.astype(np.float32)
     n_features: int = int(scaler.n_features_in_)
+    training_horizon: int = config["training"]["horizon"]
     lookback: int = config["training"]["lookback"]
-    results: dict[str, dict[str, float]] = {}
 
     from torch.utils.data import DataLoader
 
     from src.data.torch_dataset import SlidingWindowDataset
 
+    # Single inference pass using the full training horizon.
+    ds = SlidingWindowDataset(test_arr, lookback, training_horizon, target_idx)
+    loader = DataLoader(ds, batch_size=64, shuffle=False)
+    all_preds_list: list[np.ndarray] = []
+    all_actuals_list: list[np.ndarray] = []
+
+    with torch.no_grad():
+        for X_b, y_b in loader:
+            out, _ = model(X_b)  # [batch, training_horizon]
+            all_preds_list.append(out.detach().cpu().numpy())
+            all_actuals_list.append(y_b.detach().cpu().numpy())
+
+    all_preds = np.concatenate(all_preds_list)  # [N, training_horizon]
+    all_actuals = np.concatenate(all_actuals_list)  # [N, training_horizon]
+
+    results: dict[str, dict[str, float]] = {}
+
     for horizon in config["evaluation"]["horizons"]:
-        ds = SlidingWindowDataset(test_arr, lookback, horizon, target_idx)
-        loader = DataLoader(ds, batch_size=64, shuffle=False)
-        preds_list: list[np.ndarray] = []
-        actuals_list: list[np.ndarray] = []
+        # Slice to the evaluation horizon, then flatten to 1-D for metric functions.
+        preds_h = all_preds[:, :horizon].flatten()
+        actuals_h = all_actuals[:, :horizon].flatten()
 
-        with torch.no_grad():
-            for X_b, y_b in loader:
-                lstm_out, _ = model.lstm(X_b)
-                last_h = model.dropout(lstm_out[:, -1, :])
-                out = torch.stack(
-                    [model.fc(last_h) for _ in range(horizon)], dim=1
-                ).squeeze(-1)
-                preds_list.append(out.detach().cpu().numpy())
-                actuals_list.append(y_b.detach().cpu().numpy())
-
-        preds = np.concatenate(preds_list)  # [N, horizon]
-        actuals = np.concatenate(actuals_list)  # [N, horizon]
-
-        # CRITICAL: inverse-transform to °C before metrics — scaled errors meaningless
-        preds_c = _inverse_scale(preds.flatten(), scaler, n_features, target_idx)
-        actuals_c = _inverse_scale(actuals.flatten(), scaler, n_features, target_idx)
+        # Inverse-transform from standardised space back to °C before reporting.
+        preds_c = _inverse_scale(preds_h, scaler, n_features, target_idx)
+        actuals_c = _inverse_scale(actuals_h, scaler, n_features, target_idx)
 
         mse = float(mean_squared_error(actuals_c, preds_c))
         mae = float(mean_absolute_error(actuals_c, preds_c))
@@ -134,19 +146,21 @@ def evaluate_multi_horizon(config: dict[str, Any]) -> dict[str, dict[str, float]
 
 
 def plot_forecast(config: dict[str, Any]) -> None:
-    """Plot actual vs predicted temperature for first 200 test windows.
+    """Actual vs predicted temperature for the first 200 test windows.
 
-    Uses the training horizon (config.training.horizon) and saves PNG to
-    reports/figures/forecast_vs_actual.png.
+    Runs inference using the model's training horizon, then plots step-1
+    predictions against the true observations.  Both series are inverse-
+    transformed back to °C before plotting.
 
     Args:
         config: Full config dict.
     """
-    model, _scaler, _ = load_model_and_scaler(config)
+    model, scaler, _ = load_model_and_scaler(config)
     test_df = pd.read_csv("data/processed/test.csv", index_col=0)
     feature_cols = list(test_df.columns)
     target_idx: int = feature_cols.index(config["data"]["target_col"])
     test_arr = test_df.values.astype(np.float32)
+    n_features: int = int(scaler.n_features_in_)
     lookback: int = config["training"]["lookback"]
     horizon: int = config["training"]["horizon"]
 
@@ -165,21 +179,26 @@ def plot_forecast(config: dict[str, Any]) -> None:
             all_preds.append(out.detach().cpu().numpy())
             all_actual.append(y_b.detach().cpu().numpy())
 
-    preds = np.concatenate(all_preds)[:200, 0]  # first forecast step
-    actuals = np.concatenate(all_actual)[:200, 0]
+    # Step-1 predictions for the first 200 test windows
+    preds_scaled = np.concatenate(all_preds)[:200, 0]
+    actuals_scaled = np.concatenate(all_actual)[:200, 0]
+
+    # Inverse-transform to °C for the plot
+    preds_c = _inverse_scale(preds_scaled, scaler, n_features, target_idx)
+    actuals_c = _inverse_scale(actuals_scaled, scaler, n_features, target_idx)
 
     fig, ax = plt.subplots(figsize=(14, 4))
-    ax.plot(actuals, label="Actual T (degC)", color="steelblue", linewidth=1.2)
+    ax.plot(actuals_c, label="Actual T (°C)", color="steelblue", linewidth=1.2)
     ax.plot(
-        preds,
-        label="Predicted T (degC)",
+        preds_c,
+        label="Predicted T (°C)",
         color="coral",
         linewidth=1.2,
         linestyle="--",
     )
-    ax.set_title("LSTM Forecast vs Actual — First 200 Test Points (24h horizon)")
-    ax.set_xlabel("Hours")
-    ax.set_ylabel("Temperature (degC, scaled)")
+    ax.set_title("LSTM Forecast vs Actual — First 200 Test Windows (step-1 prediction)")
+    ax.set_xlabel("Test window index")
+    ax.set_ylabel("Temperature (°C)")
     ax.legend()
     ax.grid(alpha=0.3)
     plt.tight_layout()

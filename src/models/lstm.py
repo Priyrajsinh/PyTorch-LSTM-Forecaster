@@ -1,4 +1,4 @@
-"""LSTMForecaster — multi-step time series forecaster."""
+"""LSTMForecaster — direct multi-step (MIMO) time series forecaster."""
 
 from pathlib import Path
 from typing import Any
@@ -12,17 +12,25 @@ logger = get_logger(__name__)
 
 
 class LSTMForecaster(nn.Module):
-    """LSTM-based multi-step time series forecaster."""
+    """LSTM encoder with a single direct multi-step projection head (MIMO).
+
+    The LSTM encodes the lookback window into a hidden state; one linear layer
+    then projects that hidden state to all `horizon` future steps simultaneously.
+    Each output neuron specialises in its own forecast horizon, so predictions
+    are not identical across steps (unlike a repeated single-step approach).
+    """
 
     def __init__(self, config: dict[str, Any]) -> None:
-        """Initialise LSTM layers and projection head from config.
+        """Initialise LSTM layers and MIMO projection head from config.
 
         Args:
-            config: Full config dict — all sizes from config['model'].
+            config: Full config dict — all sizes read from config['model'] and
+                config['training'].
         """
         super().__init__()
         self.config = config
         m = config["model"]
+        self.horizon: int = config["training"]["horizon"]
 
         self.lstm = nn.LSTM(
             input_size=m["input_size"],
@@ -32,13 +40,14 @@ class LSTMForecaster(nn.Module):
             batch_first=True,
         )
         self.dropout = nn.Dropout(p=m["dropout"])
-        self.fc = nn.Linear(m["hidden_size"], m["output_size"])
-        self.horizon: int = config["training"]["horizon"]
+        # MIMO head: one projection for all horizon steps at once.
+        # Each of the `horizon` output neurons specialises in its own step.
+        self.fc = nn.Linear(m["hidden_size"], self.horizon)
 
     def forward(
         self, x: torch.Tensor
     ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
-        """Run forward pass through LSTM + linear projection.
+        """Run forward pass: LSTM encoder → dropout → MIMO linear projection.
 
         Args:
             x: Input tensor of shape [batch, lookback, input_size].
@@ -47,12 +56,8 @@ class LSTMForecaster(nn.Module):
             Tuple of (predictions [batch, horizon], (h_n, c_n)).
         """
         lstm_out, (h_n, c_n) = self.lstm(x)
-        last_hidden = lstm_out[:, -1, :]  # [batch, hidden_size]
-        last_hidden = self.dropout(last_hidden)
-        out = torch.stack(
-            [self.fc(last_hidden) for _ in range(self.horizon)], dim=1
-        )  # [batch, horizon, output_size]
-        out = out.squeeze(-1)  # [batch, horizon]
+        last_hidden = self.dropout(lstm_out[:, -1, :])  # [batch, hidden_size]
+        out = self.fc(last_hidden)  # [batch, horizon] — all steps in one shot
         return out, (h_n, c_n)
 
     def count_parameters(self) -> int:
@@ -67,12 +72,13 @@ class LSTMForecaster(nn.Module):
             path: Path to the .pt checkpoint file.
 
         Returns:
-            Instantiated model with loaded weights.
+            Instantiated model with loaded weights, set to eval mode.
         """
         checkpoint: dict[str, Any] = torch.load(  # nosec B614
             str(path), map_location="cpu", weights_only=False
         )
         model = cls(checkpoint["config"])
         model.load_state_dict(checkpoint["model_state"])
+        model.eval()
         logger.info("Model loaded from checkpoint", extra={"path": str(path)})
         return model

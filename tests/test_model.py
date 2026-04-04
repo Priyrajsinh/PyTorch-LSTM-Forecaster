@@ -15,13 +15,17 @@ def _load_config() -> dict:
 
 
 def test_lstm_output_shape(tmp_path: Path) -> None:
-    """Forward pass produces [batch, horizon] output."""
+    """Forward pass produces [batch, horizon] output (MIMO: all steps at once)."""
     cfg = _load_config()
     model = LSTMForecaster(cfg)
     batch = cfg["training"]["batch_size"]
     x = torch.randn(batch, cfg["training"]["lookback"], cfg["model"]["input_size"])
     out, (h, c) = model(x)
-    assert out.shape == (batch, cfg["training"]["horizon"])
+    horizon = cfg["training"]["horizon"]
+    assert out.shape == (
+        batch,
+        horizon,
+    ), f"Expected ({batch}, {horizon}), got {out.shape}"
 
 
 def test_lstm_save_load_checkpoint(tmp_path: Path) -> None:

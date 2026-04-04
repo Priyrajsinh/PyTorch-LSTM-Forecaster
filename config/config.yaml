@@ -3,11 +3,10 @@ model:
   hidden_size: 64
   num_layers: 2
   dropout: 0.2
-  output_size: 1
 
 training:
   lookback: 72
-  horizon: 24
+  horizon: 48
   batch_size: 64
   epochs: 50
   learning_rate: 1.0e-3

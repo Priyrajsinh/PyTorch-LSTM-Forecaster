@@ -20,7 +20,6 @@ def _mini_config(tmp_path: Path) -> dict[str, Any]:
             "hidden_size": 8,
             "num_layers": 1,
             "dropout": 0.0,
-            "output_size": 1,
         },
         "training": {
             "lookback": 5,

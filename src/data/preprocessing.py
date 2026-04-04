@@ -16,10 +16,14 @@ def chronological_split_and_scale(
     df: pd.DataFrame,
     config: Dict[str, Any],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, StandardScaler]:
-    """Chronological 70/15/15 split. Scaler fit on train ONLY.
+    """Chronological 70/15/15 split. Scaler fit on train ONLY, applied to all splits.
+
+    All 15 features (including the target T (degC)) are standardised so the LSTM
+    receives a consistent input scale.  The scaler is saved to models/scaler.joblib
+    and used during evaluation to inverse-transform predictions back to °C.
 
     Args:
-        df: Validated, hourly Jena Climate DataFrame.
+        df: Validated, hourly Jena Climate DataFrame (15 columns).
         config: Parsed config.yaml dict.
 
     Returns:
@@ -29,40 +33,45 @@ def chronological_split_and_scale(
     train_end = int(n * config["data"]["train_split"])
     val_end = int(n * (config["data"]["train_split"] + config["data"]["val_split"]))
 
-    train_df = df.iloc[:train_end].copy()
-    val_df = df.iloc[train_end:val_end].copy()
-    test_df = df.iloc[val_end:].copy()
+    train_raw = df.iloc[:train_end].copy()
+    val_raw = df.iloc[train_end:val_end].copy()
+    test_raw = df.iloc[val_end:].copy()
 
     logger.info(
         "Chronological split",
-        extra={"train": len(train_df), "val": len(val_df), "test": len(test_df)},
+        extra={"train": len(train_raw), "val": len(val_raw), "test": len(test_raw)},
     )
     logger.info(
         "Train range",
-        extra={"start": str(train_df.index[0]), "end": str(train_df.index[-1])},
+        extra={"start": str(train_raw.index[0]), "end": str(train_raw.index[-1])},
     )
     logger.info(
-        "Val range", extra={"start": str(val_df.index[0]), "end": str(val_df.index[-1])}
+        "Val range",
+        extra={"start": str(val_raw.index[0]), "end": str(val_raw.index[-1])},
     )
     logger.info(
         "Test range",
-        extra={"start": str(test_df.index[0]), "end": str(test_df.index[-1])},
+        extra={"start": str(test_raw.index[0]), "end": str(test_raw.index[-1])},
     )
 
-    feature_cols = [c for c in df.columns if c != config["data"]["target_col"]]
+    cols = list(df.columns)
 
-    # Fit ONLY on train — never on val or test to prevent data leakage
+    # Fit ONLY on train — never on val or test to prevent data leakage.
+    # All 15 features (including target) are scaled for consistent LSTM inputs.
     scaler = StandardScaler()
-    scaler.fit(train_df[feature_cols])
+    train_scaled = scaler.fit_transform(train_raw.values)
+    val_scaled = scaler.transform(val_raw.values)
+    test_scaled = scaler.transform(test_raw.values)
+
+    train_df = pd.DataFrame(train_scaled, index=train_raw.index, columns=cols)
+    val_df = pd.DataFrame(val_scaled, index=val_raw.index, columns=cols)
+    test_df = pd.DataFrame(test_scaled, index=test_raw.index, columns=cols)
 
     Path("models").mkdir(exist_ok=True)
     joblib.dump(scaler, "models/scaler.joblib")
-    logger.info("Scaler fitted on train and saved to models/scaler.joblib")
-
-    # Transform all splits with the same fitted scaler
-    train_df[feature_cols] = scaler.transform(train_df[feature_cols])
-    val_df[feature_cols] = scaler.transform(val_df[feature_cols])
-    test_df[feature_cols] = scaler.transform(test_df[feature_cols])
+    logger.info(
+        "Scaler (15 features) fitted on train and saved to models/scaler.joblib"
+    )
 
     Path("data/processed").mkdir(parents=True, exist_ok=True)
     train_df.to_csv("data/processed/train.csv")

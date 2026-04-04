@@ -108,18 +108,18 @@ class TestChronologicalSplitAndScale:
         assert val.index[-1] < test.index[0]
 
     def test_scaler_fit_on_train_only(self) -> None:
-        """Train feature means must be ~0 after scaling (scaler was fit on train)."""
+        """All train column means must be ~0 after scaling (scaler fit on train)."""
         from src.data.preprocessing import chronological_split_and_scale
 
         df = _make_dummy_df(200)
-        feature_cols = [c for c in FEATURE_COLS if c != "T (degC)"]
         with (
             patch("src.data.preprocessing.joblib.dump"),
             patch("pandas.DataFrame.to_csv"),
         ):
             train, _, _, _ = chronological_split_and_scale(df, CONFIG)
 
-        means = train[feature_cols].mean()
+        # All 15 features (including target) are scaled — every mean must be ~0
+        means = train[FEATURE_COLS].mean()
         assert (means.abs() < 0.05).all(), f"Train feature means not ~0: {means}"
 
     def test_scaler_saved(self) -> None:
@@ -146,8 +146,8 @@ class TestChronologicalSplitAndScale:
             chronological_split_and_scale(df, CONFIG)
         assert mock_csv.call_count == 3
 
-    def test_target_col_not_scaled(self) -> None:
-        """Target column T (degC) must NOT be standardised."""
+    def test_target_col_is_scaled(self) -> None:
+        """Target column T (degC) MUST be standardised along with all other features."""
         from src.data.preprocessing import chronological_split_and_scale
 
         df = _make_dummy_df(200)
@@ -158,7 +158,11 @@ class TestChronologicalSplitAndScale:
         ):
             train, _, _, _ = chronological_split_and_scale(df, CONFIG)
 
-        np.testing.assert_array_equal(train["T (degC)"].values, original_train_target)
+        # After scaling the target mean ≈ 0 and the original values differ
+        assert abs(train["T (degC)"].mean()) < 0.05, "T (degC) not scaled"
+        assert not np.allclose(
+            train["T (degC)"].values, original_train_target
+        ), "T (degC) must differ from original after scaling"
 
 
 # ---------------------------------------------------------------------------
