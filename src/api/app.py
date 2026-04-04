@@ -150,7 +150,10 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # ── Rate-limit state and error handler ───────────────────────────────────────
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler,  # type: ignore[arg-type]
+)
 
 
 # ── PredictionError → 422 ─────────────────────────────────────────────────────
