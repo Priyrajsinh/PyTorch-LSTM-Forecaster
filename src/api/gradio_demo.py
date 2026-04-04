@@ -74,7 +74,6 @@ demo = gr.Interface(
         "get a multi-step temperature forecast in °C.  "
         "Requires the FastAPI server to be running on localhost:8000."
     ),
-    allow_flagging="never",
 )
 
 if __name__ == "__main__":

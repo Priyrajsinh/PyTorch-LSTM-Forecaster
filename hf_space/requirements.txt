@@ -2,3 +2,4 @@ gradio
 torch
 numpy
 joblib
+pandas
