@@ -1,4 +1,4 @@
-.PHONY: install train test lint serve gradio audit docker-build
+.PHONY: install train test lint serve gradio audit docker-build hf-remote hf-push
 
 install:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -27,3 +27,14 @@ audit:
 
 docker-build:
 	docker build -t b3-lstm-forecaster .
+
+# HF Space deployment
+# Usage:
+#   make hf-remote HF_USER=Priyrajsinh HF_SPACE=my-space-name
+#   make hf-push   HF_SPACE_DIR=hf_space
+hf-remote:
+	git remote add hf-space https://huggingface.co/spaces/$(HF_USER)/$(HF_SPACE)
+	@echo "Remote 'hf-space' added → push with: make hf-push HF_SPACE_DIR=hf_space"
+
+hf-push:
+	git subtree push --prefix=$(HF_SPACE_DIR) hf-space main
