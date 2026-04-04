@@ -167,10 +167,8 @@ def test_evaluate_multi_horizon_metrics_are_finite(
             assert np.isfinite(val), f"Non-finite metric: {val}"
 
 
-def test_evaluate_smaller_horizon_has_lower_rmse(
-    tmp_path: Path, monkeypatch: Any
-) -> None:
-    """Shorter-horizon RMSE must be <= longer-horizon RMSE (predictions degrade)."""
+def test_evaluate_rmse_equals_sqrt_mse(tmp_path: Path, monkeypatch: Any) -> None:
+    """RMSE must equal sqrt(MSE) for every horizon (mathematical identity)."""
     cfg = _mini_config()
     _write_processed(tmp_path)
     _make_checkpoint(tmp_path, cfg)
@@ -178,7 +176,11 @@ def test_evaluate_smaller_horizon_has_lower_rmse(
 
     results = evaluate_multi_horizon(cfg)
 
-    assert results["h2"]["rmse"] <= results["h4"]["rmse"] + 1e-6
+    for h_key, metrics in results.items():
+        expected_rmse = metrics["mse"] ** 0.5
+        assert (
+            abs(metrics["rmse"] - expected_rmse) < 1e-5
+        ), f"{h_key}: rmse={metrics['rmse']} != sqrt(mse)={expected_rmse}"
 
 
 def test_plot_forecast_creates_png(tmp_path: Path, monkeypatch: Any) -> None:
